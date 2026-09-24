@@ -24,46 +24,84 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK 34
+      - name: Configure Android SDK
         run: |
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
-          yes | sdkmanager --licenses || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-      - name: Check project
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          fi
+
+          echo "Using sdkmanager: $SDKMANAGER"
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager was not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Check Android SDK
         run: |
-          echo "Project files:"
+          echo "Android SDK:"
+          ls -la "$ANDROID_HOME/platforms"
+          ls -la "$ANDROID_HOME/build-tools"
+
+      - name: Check Sely Launcher project
+        run: |
+          echo "Project structure:"
           find . -maxdepth 3 -type f | sort
 
       - name: Make Gradle executable
         working-directory: SelyLauncher
-        run: chmod +x gradlew 2>/dev/null || true
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+          fi
 
-      - name: Generate Gradle wrapper if missing
+      - name: Prepare Gradle
         working-directory: SelyLauncher
         run: |
           if [ ! -f gradlew ]; then
             echo "Gradle wrapper not found."
-            echo "Installing Gradle 8.7 temporarily..."
+            echo "Downloading Gradle 8.7..."
+
             wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
+
             unzip -q gradle-8.7-bin.zip
+
             ./gradle-8.7/bin/gradle wrapper --gradle-version 8.7
           fi
 
-      - name: Build Debug APK
+          chmod +x gradlew
+
+      - name: Build Sely Launcher Debug APK
         working-directory: SelyLauncher
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew assembleDebug --stacktrace
 
       - name: Verify APK
         run: |
-          ls -lh SelyLauncher/app/build/outputs/apk/debug/
-          test -f SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
+          echo "Checking APK..."
+
+          if [ ! -f "SelyLauncher/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          ls -lh SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Sely Launcher APK
         uses: actions/upload-artifact@v4
         with:
-          name: Sely-Launcher-Debug-APK
+          name: Sely-Launcher-APK
           path: SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
