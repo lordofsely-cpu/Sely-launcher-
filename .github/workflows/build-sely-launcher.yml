@@ -43,24 +43,35 @@ jobs:
 
       - name: Extract Sely Launcher
         run: |
-          echo "Repository contents:"
-          ls -lah
-
-          echo "Extracting SelyLauncher.zip..."
-
+          mkdir -p project
           unzip -o SelyLauncher.zip -d project
 
-          echo "Extracted files:"
-          find project -maxdepth 3 -type f | sort
-
-      - name: Locate Android project
+      - name: Enable AndroidX
+        working-directory: project/SelyLauncher
         run: |
-          echo "Searching for Gradle project..."
+          echo "Creating gradle.properties..."
 
-          find project -name settings.gradle.kts -o \
-                       -name settings.gradle -o \
-                       -name build.gradle.kts -o \
-                       -name build.gradle
+          cat > gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          EOF
+
+          echo "gradle.properties:"
+          cat gradle.properties
+
+      - name: Check project
+        working-directory: project/SelyLauncher
+        run: |
+          echo "Project:"
+          pwd
+
+          echo "Files:"
+          find . -maxdepth 2 -type f | sort
+
+          test -f build.gradle.kts
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
 
       - name: Prepare Gradle
         working-directory: project/SelyLauncher
@@ -72,7 +83,6 @@ jobs:
             echo "Downloading Gradle 8.7..."
 
             wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
-
             unzip -q gradle-8.7-bin.zip
 
             ./gradle-8.7/bin/gradle wrapper --gradle-version 8.7
@@ -87,7 +97,7 @@ jobs:
 
       - name: Verify APK
         run: |
-          echo "Checking generated APK..."
+          echo "Searching for APK..."
 
           find project -name "*.apk" -type f -print
 
