@@ -26,9 +26,6 @@ jobs:
 
       - name: Configure Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
           if [ ! -f "$SDKMANAGER" ]; then
@@ -37,11 +34,6 @@ jobs:
 
           echo "Using sdkmanager: $SDKMANAGER"
 
-          if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found"
-            exit 1
-          fi
-
           yes | "$SDKMANAGER" --licenses >/dev/null || true
 
           "$SDKMANAGER" \
@@ -49,29 +41,29 @@ jobs:
             "platforms;android-34" \
             "build-tools;34.0.0"
 
-      - name: Check Android SDK
+      - name: Extract Sely Launcher
         run: |
-          echo "Android SDK configured successfully."
-          ls -la "$ANDROID_HOME/platforms"
-          ls -la "$ANDROID_HOME/build-tools"
+          echo "Repository contents:"
+          ls -lah
 
-      - name: Check Sely Launcher project
+          echo "Extracting SelyLauncher.zip..."
+
+          unzip -o SelyLauncher.zip -d project
+
+          echo "Extracted files:"
+          find project -maxdepth 3 -type f | sort
+
+      - name: Locate Android project
         run: |
-          echo "Current directory:"
-          pwd
+          echo "Searching for Gradle project..."
 
-          echo "Project files:"
-          find . -maxdepth 3 -type f | sort
-
-          echo "Checking Gradle project..."
-
-          test -f build.gradle.kts
-          test -f settings.gradle.kts
-          test -d app
-
-          echo "Sely Launcher project found."
+          find project -name settings.gradle.kts -o \
+                       -name settings.gradle -o \
+                       -name build.gradle.kts -o \
+                       -name build.gradle
 
       - name: Prepare Gradle
+        working-directory: project/SelyLauncher
         run: |
           if [ -f gradlew ]; then
             chmod +x gradlew
@@ -89,23 +81,23 @@ jobs:
           fi
 
       - name: Build Sely Launcher Debug APK
+        working-directory: project/SelyLauncher
         run: |
           ./gradlew assembleDebug --stacktrace
 
       - name: Verify APK
         run: |
-          echo "Checking APK..."
+          echo "Checking generated APK..."
 
-          if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
+          find project -name "*.apk" -type f -print
 
-          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          test -f project/SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
+
+          ls -lh project/SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Sely Launcher APK
         uses: actions/upload-artifact@v4
         with:
           name: Sely-Launcher-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: project/SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
