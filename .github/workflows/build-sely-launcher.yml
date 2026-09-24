@@ -38,7 +38,7 @@ jobs:
           echo "Using sdkmanager: $SDKMANAGER"
 
           if [ -z "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager was not found"
+            echo "ERROR: sdkmanager not found"
             exit 1
           fi
 
@@ -51,26 +51,31 @@ jobs:
 
       - name: Check Android SDK
         run: |
-          echo "Android SDK:"
+          echo "Android SDK configured successfully."
           ls -la "$ANDROID_HOME/platforms"
           ls -la "$ANDROID_HOME/build-tools"
 
       - name: Check Sely Launcher project
         run: |
-          echo "Project structure:"
+          echo "Current directory:"
+          pwd
+
+          echo "Project files:"
           find . -maxdepth 3 -type f | sort
 
-      - name: Make Gradle executable
-        working-directory: SelyLauncher
+          echo "Checking Gradle project..."
+
+          test -f build.gradle.kts
+          test -f settings.gradle.kts
+          test -d app
+
+          echo "Sely Launcher project found."
+
+      - name: Prepare Gradle
         run: |
           if [ -f gradlew ]; then
             chmod +x gradlew
-          fi
-
-      - name: Prepare Gradle
-        working-directory: SelyLauncher
-        run: |
-          if [ ! -f gradlew ]; then
+          else
             echo "Gradle wrapper not found."
             echo "Downloading Gradle 8.7..."
 
@@ -79,12 +84,11 @@ jobs:
             unzip -q gradle-8.7-bin.zip
 
             ./gradle-8.7/bin/gradle wrapper --gradle-version 8.7
+
+            chmod +x gradlew
           fi
 
-          chmod +x gradlew
-
       - name: Build Sely Launcher Debug APK
-        working-directory: SelyLauncher
         run: |
           ./gradlew assembleDebug --stacktrace
 
@@ -92,16 +96,16 @@ jobs:
         run: |
           echo "Checking APK..."
 
-          if [ ! -f "SelyLauncher/app/build/outputs/apk/debug/app-debug.apk" ]; then
+          if [ ! -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
             echo "ERROR: APK was not generated."
             exit 1
           fi
 
-          ls -lh SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload Sely Launcher APK
         uses: actions/upload-artifact@v4
         with:
           name: Sely-Launcher-APK
-          path: SelyLauncher/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
